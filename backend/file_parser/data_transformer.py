@@ -45,13 +45,16 @@ def _clean_row(row: Dict[str, Any], fields_map: Dict[str, tuple]) -> Dict[str, A
         # 1) 精确匹配
         raw_val = row.get(source_col)
 
-        # 2) 精确匹配失败 → Agent 语义匹配
+        # 2) 精确匹配失败 → Agent 语义匹配（支持前缀，如 "revenue" 匹配 "revenue_actual"）
         if raw_val is None:
             for col_name, cell_val in row.items():
                 match = _match_col(str(col_name))
-                if match and match[0] == target_key:
-                    raw_val = cell_val
-                    break
+                if match:
+                    matched_field = match[0]
+                    # 完全匹配 或 前缀匹配（target_key 以 matched_field 开头）
+                    if matched_field == target_key or target_key.startswith(matched_field + "_"):
+                        raw_val = cell_val
+                        break
 
         if raw_val is not None and str(raw_val).strip():
             is_empty = False
