@@ -159,6 +159,28 @@ async def vault_sync():
     return {"status": "ok", "keys": len(merged), "data": merged}
 
 
+# ── 单文件同步 ──────────────────────────────────
+
+@router.post("/sync/{record_id}")
+async def vault_sync_one(record_id: int):
+    """同步单个文件的解析数据"""
+    async with db_session() as db:
+        row = await db.execute(
+            "SELECT filename, parsed_data FROM uploads WHERE id=? AND status='done' AND parsed_data IS NOT NULL",
+            (record_id,),
+        )
+        r = await row.fetchone()
+    if not r:
+        return {"status": "not_found"}
+
+    try:
+        data = json.loads(r["parsed_data"])
+    except json.JSONDecodeError:
+        return {"status": "error", "message": "数据损坏"}
+
+    return {"status": "ok", "filename": r["filename"], "keys": len(data), "data": data}
+
+
 # ── 记录管理 ────────────────────────────────────
 
 @router.get("/history")

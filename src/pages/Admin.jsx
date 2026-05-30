@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, startTransition } from "react";
 import { useDashboardStore } from "../store/dashboardStore";
 import { VAULT_API } from "../config/api";
 import { syncDashboardData } from "../services/syncService";
@@ -69,13 +69,24 @@ export default function Admin() {
     setSyncing(true);
     const result = await syncDashboardData();
     if (result.ok) {
-      batchUpdate(result.data);
+      startTransition(() => batchUpdate(result.data));
       setDataSource({ filename: `数据中心 (${result.keys}类)`, uploadedAt: Date.now() });
       setToast(`已同步 ${result.keys} 类数据到看板`, "success");
     } else {
       setMsg(result.message || "同步失败");
     }
     setSyncing(false);
+  };
+
+  const handleSyncOne = async (id, filename) => {
+    try {
+      const r = await fetch(`${VAULT_API}/sync/${id}`, { method: "POST" });
+      const j = await r.json();
+      if (j.status === "ok" && j.data) {
+        startTransition(() => batchUpdate(j.data));
+        setToast(`已同步 ${filename} (${j.keys} 类)`, "success");
+      }
+    } catch { setMsg("同步失败"); }
   };
 
   const handleDelete = async (id) => {
@@ -191,6 +202,10 @@ export default function Admin() {
                     {r.status === "done" && <span className="text-positive text-xs shrink-0">{r.row_count}行</span>}
                     {r.status === "error" && <span className="text-negative text-xs shrink-0">{r.error}</span>}
                     {r.status === "queued" && <span className="text-warning text-xs shrink-0">待处理</span>}
+                    {r.status === "done" && (
+                      <button onClick={() => handleSyncOne(r.id, r.filename)}
+                        className="text-accent hover:text-accent-hover text-xs shrink-0 font-medium">同步</button>
+                    )}
                     <button onClick={() => handleDelete(r.id)}
                       className="text-text-muted hover:text-negative text-xs shrink-0">删除</button>
                   </div>
