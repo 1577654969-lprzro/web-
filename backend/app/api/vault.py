@@ -194,6 +194,44 @@ async def vault_history():
     return {"history": history}
 
 
+# ── 快照管理 ────────────────────────────────────
+
+@router.get("/snapshots")
+async def vault_snapshots():
+    """获取所有已完成的文件记录，作为回滚快照"""
+    async with db_session() as db:
+        rows = await db.execute(
+            "SELECT id, filename, created_at, row_count, match_info FROM uploads WHERE status='done' ORDER BY created_at DESC LIMIT 20"
+        )
+        snapshots = [dict(r) for r in await rows.fetchall()]
+    return {"snapshots": snapshots}
+
+
+@router.post("/rollback/{record_id}")
+async def vault_rollback(record_id: int):
+    """回滚到指定的快照版本"""
+    async with db_session() as db:
+        row = await db.execute(
+            "SELECT parsed_data, filename FROM uploads WHERE id=? AND status='done'",
+            (record_id,)
+        )
+        r = await row.fetchone()
+        if not r:
+            return {"status": "error", "message": "快照不存在"}
+        
+        data = json.loads(r["parsed_data"])
+        
+        # 清空当前活跃数据并注入快照数据
+        await db.execute("DELETE FROM dashboard_data")
+        for key, val in data.items():
+            await db.execute(
+                "INSERT INTO dashboard_data (data_key, data_json, source_file, updated_at) VALUES (?, ?, ?, ?)",
+                (key, json.dumps(val, ensure_ascii=False), r["filename"], datetime.now().isoformat())
+            )
+            
+    return {"status": "ok", "message": f"已成功回滚至版本: {r['filename']}"}
+
+
 @router.delete("/record/{record_id}")
 async def vault_delete(record_id: int):
     async with db_session() as db:

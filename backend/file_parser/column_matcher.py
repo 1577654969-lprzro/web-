@@ -12,61 +12,48 @@
 """
 
 import re
+from .mappings import SMART_ALIASES
 
-# 关键词配置：{ 目标键: [关键词列表] }
+# 扩展原有的 FIELD_KEYWORDS，合并 SMART_ALIASES
 FIELD_KEYWORDS = {
     # 收入相关
     "revenue": ["收入", "营收", "销售额", "含税收入", "不含税收入", "revenue", "sales"],
-    "revenue_budget": ["收入预算", "预算收入", "目标收入"],
-    "revenue_change": ["收入环比", "收入变化", "收入变动", "环比变化"],
-    "revenue_yoy": ["收入同比", "同比收入", "去年同期收入"],
-    "revenue_rate": ["收入达成率", "预算达成率", "收入完成率"],
-
+    "revenue_actual": ["收入_实际", "实际收入", "本月收入", "营收_实际", "Revenue_Actual"],
+    "revenue_budget": ["收入_预算", "预算收入", "目标收入", "Revenue_Budget"],
+    "revenue_rate": ["收入_达成率", "达成率", "完成率", "Revenue_Rate"],
+    
     # 毛利相关
     "gross_profit": ["毛利", "毛利额", "gross profit"],
-    "gp_rate": ["毛利率", "毛利达成率", "margin"],
-    "gp_budget": ["毛利预算", "目标毛利"],
+    "gp_actual": ["毛利_实际", "实际毛利", "毛利额", "GrossProfit_Actual"],
+    "gp_budget": ["毛利_预算", "预算毛利", "GrossProfit_Budget"],
+    "gp_rate": ["毛利_达成率", "毛利率", "GP_Rate", "margin"],
 
     # 费用相关
     "expense": ["费用", "支出", "花费"],
-    "expense_budget": ["费用预算", "预算费用"],
-    "expense_rate": ["费用使用率", "费用占比"],
+    "expense_actual": ["费用_实际", "实际费用", "本月支出", "Expense_Actual"],
+    "expense_budget": ["费用_预算", "预算费用", "Expense_Budget"],
+    "expense_rate": ["费用_使用率", "费用率", "Expense_Rate"],
 
-    # 客户/产品
+    # 客户/产品/通用
     "customer": ["客户", "买方", "采购方"],
     "product": ["产品", "商品", "品名"],
-    "share": ["占比", "份额", "比重", "share", "%"],
-    "gross_rate": ["毛利率", "利润率", "gross rate"],
+    "share": ["占比", "收入占比", "份额", "比重", "share", "%"],
+    "gross_rate": ["毛利率", "利润率", "gross rate", "GrossRate"],
+    "name": ["客户名称", "产品名称", "名称", "名字", "供应商名称", "name", "Name"],
+    "amount": ["金额", "万元", "库存金额", "应收金额", "amount", "Amount"],
+    "dept": ["部门", "事业部", "板块", "经营部", "dept", "Dept"],
+    "channel": ["渠道", "快递渠道", "平台", "channel", "Channel"],
 
-    # 应收应付
-    "ar_amount": ["应收", "应收账款", "AR"],
-    "ap_amount": ["应付", "应付账款", "AP"],
-    "overdue": ["逾期", "超期", "拖欠"],
-    "aging_30": ["30天", "30天内", "<30"],
-    "aging_3060": ["30-60", "30到60", "3060"],
-    "aging_60180": ["60-180", "60到180"],
-    "aging_180360": ["180-360", "180到360"],
-    "aging_360p": ["360天", "一年以上", "超一年", "360以上"],
-
-    # 库存
-    "inventory": ["库存", "存货", "stock"],
-    "aging_days": ["库龄", "库存天数", "aging"],
-
-    # 运费
-    "freight": ["运费", "物流费", "快递费"],
-    "tickets": ["票数", "订单数", "tickets"],
-    "fee_ratio": ["费比", "费率", "费用率"],
-    "avg_per_ticket": ["每票运费", "票均", "平均运费"],
-    "avg_value": ["每票货值", "票均货值"],
-
-    # 通用
-    "date": ["日期", "月份", "时间"],
-    "dept": ["部门", "事业部", "板块", "dept"],
-    "channel": ["渠道", "平台", "channel"],
-    "amount": ["金额", "万元", "amount"],
-    "name": ["名称", "名字", "name"],
-    "rate": ["率", "%", "rate", "ratio"],
+    # 更多具体字段映射可以继续通过 SMART_ALIASES 合并
 }
+
+# 合并 mappings.py 中的 SMART_ALIASES
+for standard_key, aliases in SMART_ALIASES.items():
+    if standard_key in FIELD_KEYWORDS:
+        # 合并并去重
+        FIELD_KEYWORDS[standard_key] = list(set(FIELD_KEYWORDS[standard_key] + aliases))
+    else:
+        FIELD_KEYWORDS[standard_key] = aliases
 
 
 def _clean(text: str) -> str:
@@ -129,13 +116,14 @@ def match_columns(headers: list[str]) -> dict[str, str]:
 
 
 # ── Sheet 名关键词 ────────────────────────────
+# 合并原有规则与 mappings.py 中的 Sheet 列表
 SHEET_KEYWORDS = {
     "overviewData": ["汇总", "概览", "总览", "经营", "P4", "overview", "summary"],
     "expenseBreakdown": ["费用", "支出", "开支", "P6", "expense"],
     "departmentData": ["部门", "事业部", "分部", "P5", "dept"],
     "bizCustomerTop10": ["客户", "买方", "P10", "customer"],
     "bizProductTop10": ["产品", "商品", "品类", "P10", "product"],
-    "productCategoryData": ["摇钱树", "钱串子", "瘦狗", "现金牛", "category"],
+    "productCategoryData": ["category"],
     "onlineSalesData": ["线上", "电商", "平台", "P13", "online"],
     "arData": ["应收", "AR", "P15", "receivable"],
     "apData": ["应付", "AP", "P16", "payable"],
@@ -145,6 +133,32 @@ SHEET_KEYWORDS = {
     "freightByChannel": ["运费", "物流", "快递", "P23", "freight"],
     "freightOverview": ["运费总", "P23"],
 }
+
+# 动态同步 mappings.py 中的 sheet 列表到关键词中
+from .mappings import OVERVIEW, EXPENSE, DEPARTMENTS, BIZ_CUSTOMER_TOP10, BIZ_PRODUCT_TOP10, KEY_CUSTOMER, ONLINE_SALES, AR_AGING, AR_TOP10, AP_AGING_DIST, AP_TOP10, AR_BY_PERSON, INVENTORY_PRODUCT_REMAINING, INVENTORY_PRODUCT_IN_STOCK, INVENTORY_PRODUCT_TOP10, INVENTORY_SUPPLIER_TOP10, FREIGHT_CHANNEL
+
+MODULE_MAP = {
+    "overviewData": OVERVIEW,
+    "expenseBreakdown": EXPENSE,
+    "departmentData": DEPARTMENTS,
+    "bizCustomerTop10": BIZ_CUSTOMER_TOP10,
+    "bizProductTop10": BIZ_PRODUCT_TOP10,
+    "onlineSalesData": ONLINE_SALES,
+    "arData": AR_AGING,
+    "apData": AP_AGING_DIST,
+    "arByPerson": AR_BY_PERSON,
+    "inventoryProduct": INVENTORY_PRODUCT_REMAINING,
+    "inventorySupplier": INVENTORY_SUPPLIER_TOP10,
+    "freightByChannel": FREIGHT_CHANNEL,
+}
+
+for key, config in MODULE_MAP.items():
+    if "sheet" in config:
+        sheets = config["sheet"] if isinstance(config["sheet"], list) else [config["sheet"]]
+        if key in SHEET_KEYWORDS:
+            SHEET_KEYWORDS[key] = list(set(SHEET_KEYWORDS[key] + sheets))
+        else:
+            SHEET_KEYWORDS[key] = sheets
 
 
 def match_sheet(name: str) -> tuple[str, float] | None:

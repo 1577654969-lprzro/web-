@@ -96,6 +96,24 @@ export default function Admin() {
     } catch { setMsg("同步失败"); }
   };
 
+  const handleRollback = async (id, filename) => {
+    if (!window.confirm(`确定要回滚到版本 [${filename}] 吗？当前看板数据将被替换。`)) return;
+    try {
+      const r = await fetch(`${VAULT_API}/rollback/${id}`, { method: "POST" });
+      const j = await r.json();
+      if (j.status === "ok") {
+        // 回滚成功后重新同步前端 Store
+        const syncRes = await syncDashboardData();
+        if (syncRes.ok) {
+          startTransition(() => batchUpdate(syncRes.data));
+          setToast(`已成功回滚至: ${filename}`, "success");
+        }
+      } else {
+        setToast(j.message || "回滚失败", "error");
+      }
+    } catch { setToast("回滚请求失败", "error"); }
+  };
+
   const handleDelete = async (id) => {
     await fetch(`${VAULT_API}/record/${id}`, { method: "DELETE" });
     loadHistory();
@@ -247,8 +265,13 @@ export default function Admin() {
                     {r.status === "error" && <span className="text-negative text-xs shrink-0">{r.error}</span>}
                     {r.status === "queued" && <span className="text-warning text-xs shrink-0">待处理</span>}
                     {r.status === "done" && (
-                      <button onClick={() => handleSyncOne(r.id, r.filename)}
-                        className="text-accent hover:text-accent-hover text-xs shrink-0 font-medium">同步</button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleSyncOne(r.id, r.filename)}
+                          className="text-accent hover:text-accent-hover text-xs shrink-0 font-medium">同步</button>
+                        <button onClick={() => handleRollback(r.id, r.filename)}
+                          className="text-positive hover:text-positive/80 text-xs shrink-0 font-medium"
+                          title="全量覆盖当前看板">回滚</button>
+                      </div>
                     )}
                     <button onClick={() => handleDelete(r.id)}
                       className="text-text-muted hover:text-negative text-xs shrink-0">删除</button>

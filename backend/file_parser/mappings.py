@@ -5,9 +5,35 @@ Excel Sheet → Frontend JSON 映射配置
 修改此文件即可适配不同 Excel 布局，无需改动转换引擎。
 """
 
+# 智能别名映射配置 (Smart Alias Map)
+# 格式: { "standard_field": ["alias1", "alias2", ...] }
+SMART_ALIASES = {
+    "revenue_actual": ["收入_实际", "实际收入", "本月收入", "营收_实际", "Revenue_Actual"],
+    "revenue_budget": ["收入_预算", "预算收入", "目标收入", "Revenue_Budget"],
+    "revenue_rate": ["收入_达成率", "达成率", "完成率", "Revenue_Rate"],
+    "gp_actual": ["毛利_实际", "实际毛利", "毛利额", "GrossProfit_Actual"],
+    "gp_budget": ["毛利_预算", "预算毛利", "GrossProfit_Budget"],
+    "gp_rate": ["毛利_达成率", "毛利率", "GP_Rate"],
+    "expense_actual": ["费用_实际", "实际费用", "本月支出", "Expense_Actual"],
+    "expense_budget": ["费用_预算", "预算费用", "Expense_Budget"],
+    "expense_rate": ["费用_使用率", "费用率", "Expense_Rate"],
+    
+    # 部门相关
+    "dept": ["部门", "事业部", "经营部", "Dept", "Department"],
+    "revenue202604": ["收入_202604", "本月收入", "收入", "Revenue"],
+    "revenueChange": ["收入_环比变化", "环比", "增长率", "Change"],
+    "grossProfitRate202604": ["毛利率_202604", "毛利率", "GPRate"],
+    
+    # 列表通用
+    "name": ["客户名称", "产品名称", "名称", "供应商名称", "Name"],
+    "amount": ["金额", "库存金额", "应收金额", "Amount"],
+    "share": ["占比", "收入占比", "百分比", "Share"],
+    "channel": ["渠道", "快递渠道", "平台", "Channel"],
+}
+
 # ── 经营概览 ──────────────────────────────────
 OVERVIEW = {
-    "sheet": "P4",
+    "sheet": ["P4", "经营概览", "概览"],
     "fields": {
         "revenue_actual": ("收入_实际", float),
         "revenue_budget": ("收入_预算", float),
@@ -28,7 +54,7 @@ OVERVIEW = {
 }
 
 EXPENSE = {
-    "sheet": "P6",
+    "sheet": ["P6", "费用明细", "费用分析"],
     "key_field": "category",
     "fields": {
         "category": ("费用类别", str),
@@ -38,7 +64,7 @@ EXPENSE = {
 }
 
 DEPARTMENTS = {
-    "sheet": "P5",
+    "sheet": ["P5", "分部门", "部门经营"],
     "key_field": "dept",
     "fields": {
         "dept": ("部门", str),
@@ -55,7 +81,7 @@ DEPARTMENTS = {
 
 # ── 销售分析 ──────────────────────────────────
 BIZ_CUSTOMER_TOP10 = {
-    "sheet": "P10",
+    "sheet": ["P10", "客户分析", "Top客户"],
     "key_field": "name",
     "fields": {
         "name": ("客户名称", str),
@@ -66,7 +92,7 @@ BIZ_CUSTOMER_TOP10 = {
 }
 
 BIZ_PRODUCT_TOP10 = {
-    "sheet": "P10",
+    "sheet": ["P10", "产品分析", "Top产品"],
     "key_field": "name",
     "start_row": 14,  # 产品表从第14行开始
     "fields": {
@@ -78,7 +104,7 @@ BIZ_PRODUCT_TOP10 = {
 }
 
 KEY_CUSTOMER = {
-    "sheet": "P12",
+    "sheet": ["P12", "大客户", "核心客户"],
     "key_field": "name",
     "fields": {
         "name": ("客户名称", str),
@@ -89,7 +115,7 @@ KEY_CUSTOMER = {
 }
 
 ONLINE_SALES = {
-    "sheet": "P13",
+    "sheet": ["P13", "线上销售", "电商分析"],
     "key_field": "channel",
     "fields": {
         "channel": ("渠道", str),
@@ -103,7 +129,7 @@ ONLINE_SALES = {
 
 # ── 应收应付 ──────────────────────────────────
 AR_AGING = {
-    "sheet": "P15",
+    "sheet": ["P15", "应收账龄", "AR"],
     "key_field": "dept",
     "fields": {
         "dept": ("部门", str),
@@ -116,7 +142,7 @@ AR_AGING = {
 }
 
 AR_TOP10 = {
-    "sheet": "P15",
+    "sheet": ["P15", "应收客户", "AR排名"],
     "key_field": "name",
     "start_row": 8,
     "fields": {
@@ -127,7 +153,7 @@ AR_TOP10 = {
 }
 
 AP_AGING_DIST = {
-    "sheet": "P16",
+    "sheet": ["P16", "应付账龄", "AP"],
     "key_field": "bucket",
     "fields": {
         "bucket": ("账龄段", str),
@@ -137,7 +163,7 @@ AP_AGING_DIST = {
 }
 
 AP_TOP10 = {
-    "sheet": "P16",
+    "sheet": ["P16", "应付供应商", "AP排名"],
     "key_field": "name",
     "start_row": 10,
     "fields": {
@@ -147,7 +173,7 @@ AP_TOP10 = {
 }
 
 AR_BY_PERSON = {
-    "sheet": "P17",
+    "sheet": ["P17", "业务员回款", "回款分析"],
     "key_field": "name",
     "fields": {
         "name": ("业务员", str),
@@ -159,7 +185,7 @@ AR_BY_PERSON = {
 
 # ── 库存分析 ──────────────────────────────────
 INVENTORY_PRODUCT_REMAINING = {
-    "sheet": "P20",
+    "sheet": ["P20", "库存概览", "库存分析"],
     "key_field": "bucket",
     "fields": {
         "bucket": ("库龄段", str),
@@ -169,7 +195,7 @@ INVENTORY_PRODUCT_REMAINING = {
 }
 
 INVENTORY_PRODUCT_IN_STOCK = {
-    "sheet": "P20",
+    "sheet": ["P20", "在库库存", "库存明细"],
     "key_field": "bucket",
     "start_row": 8,
     "fields": {
@@ -180,7 +206,7 @@ INVENTORY_PRODUCT_IN_STOCK = {
 }
 
 INVENTORY_PRODUCT_TOP10 = {
-    "sheet": "P20",
+    "sheet": ["P20", "产品库存排名", "Top产品库存"],
     "key_field": "name",
     "start_row": 14,
     "fields": {
@@ -191,7 +217,7 @@ INVENTORY_PRODUCT_TOP10 = {
 }
 
 INVENTORY_SUPPLIER_TOP10 = {
-    "sheet": "P21",
+    "sheet": ["P21", "供应商库存", "Top供应商库存"],
     "key_field": "name",
     "fields": {
         "name": ("供应商名称", str),
@@ -202,7 +228,7 @@ INVENTORY_SUPPLIER_TOP10 = {
 
 # ── 运费分析 ──────────────────────────────────
 FREIGHT_CHANNEL = {
-    "sheet": "P23",
+    "sheet": ["P23", "运费分析", "物流费比"],
     "key_field": "channel",
     "fields": {
         "channel": ("快递渠道", str),
@@ -212,3 +238,4 @@ FREIGHT_CHANNEL = {
         "feeRatio": ("本月费比", float),
     },
 }
+

@@ -2,4 +2,4 @@
 export const API_BASE = "http://localhost:8000";
 export const API = `${API_BASE}/api`;
 export const VAULT_API = `${API}/vault`;
-export const APP_VERSION = "2.1.0";
+export const APP_VERSION = "5.0.0";

@@ -68,9 +68,14 @@ def _clean_row(row: Dict[str, Any], fields_map: Dict[str, tuple]) -> Dict[str, A
 
 def _find_sheet(raw_data, target_key, mapping_config):
     """Agent 方式查找 Sheet: 先精确匹配映射名, 再 Agent 匹配 Sheet 名"""
-    hard_name = mapping_config["sheet"]
-    if hard_name in raw_data:
-        return raw_data[hard_name]
+    hard_names = mapping_config["sheet"]
+    if isinstance(hard_names, str):
+        hard_names = [hard_names]
+    
+    for name in hard_names:
+        if name in raw_data:
+            return raw_data[name]
+
     # Agent sheet 匹配
     for sheet_name, rows in raw_data.items():
         m = _match_sheet(str(sheet_name))
@@ -100,20 +105,7 @@ def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
             if raw_val is not None and _safe_float(raw_val) > 0:
                 r = row
                 break
-    if p4:
-        # 找第一个有实际数据的行（跳过标题行）
-        r = None
-        for row in p4:
-            raw_val = row.get(OVERVIEW["fields"]["revenue_actual"][0])
-            if raw_val is None:
-                for col_name, cell_val in row.items():
-                    m = _match_col(str(col_name))
-                    if m and m[0] == "revenue":
-                        raw_val = cell_val
-                        break
-            if raw_val is not None and _safe_float(raw_val) > 0:
-                r = row
-                break
+        
         r = r or p4[0]  # fallback to first row
 
         def _get(k):

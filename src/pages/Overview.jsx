@@ -8,31 +8,28 @@ import ChartCard, { CustomTooltip } from "../components/charts/ChartCard";
 import { useAnalysis } from "../components/analysis/AnalysisContext";
 import { useDashboardStore } from "../store/dashboardStore";
 import { selectBudgetChartData, ensureArray, ensureObject } from "../store/selectors";
+import { useMetrics } from "../hooks/useMetrics";
 import { useMemo } from "react";
 
 const COLORS = ["#38BDF8", "#10B981", "#F59E0B", "#F43F5E", "#8B5CF6", "#EC4899", "#06B6D4"];
 
 export default function Overview() {
-  const overviewData = useDashboardStore((state) => state.data.overviewData);
+  const { overview, allData } = useMetrics();
+  const { revenueActual, grossProfitActual, grossMargin, revenueBudgetRate, revenueYoyRate, raw } = overview;
+  const { budgetVsActual, yoy, cumulative } = raw;
+
   const departmentData = useDashboardStore((state) => state.data.departmentData);
   const expenseBreakdown = useDashboardStore((state) => state.data.expenseBreakdown);
-  const allData = useDashboardStore((state) => state.data);
-
-  const { budgetVsActual = {}, yoy = {}, cumulative = {} } = overviewData || {};
 
   const budgetData = useMemo(() => selectBudgetChartData(allData), [allData]);
 
-  // 动态计算值
-  const grossMargin = useMemo(() =>
-    budgetVsActual.revenue?.actual ? (budgetVsActual.grossProfit?.actual / budgetVsActual.revenue.actual * 100) : 0,
-    [budgetVsActual]);
   const budgetMargin = 3.23; // 预算毛利率目标
   const yoyGrossRate = yoy?.grossProfit?.rate || yoy?.revenue?.rate || 0;
 
   useAnalysis("经营概览", {
     grossMargin,
-    budgetRate: budgetVsActual.revenue?.rate || 0,
-    actualRevenue: budgetVsActual.revenue?.actual || 0,
+    budgetRate: revenueBudgetRate,
+    actualRevenue: revenueActual,
     budgetRevenue: budgetVsActual.revenue?.budget || 0,
   });
 
@@ -56,24 +53,24 @@ export default function Overview() {
     <div className="space-y-8">
       <h2 className="section-title">经营概览 — 2026年4月</h2>
       <p className="text-sm text-text-muted mt-1">
-        月度收入 {safe(budgetVsActual.revenue?.actual)?.toLocaleString()} 万元，预算达成率 {safe(budgetVsActual.revenue?.rate)?.toFixed(1)}%；
-        毛利率 {grossMargin.toFixed(2)}%，同比 {(safe(yoy?.revenue?.rate) || 100) > 100 ? "增长" : "下降"} {Math.abs((safe(yoy?.revenue?.rate) || 100) - 100).toFixed(2)} 个百分点
+        月度收入 {revenueActual.toLocaleString()} 万元，预算达成率 {revenueBudgetRate.toFixed(1)}%；
+        毛利率 {grossMargin.toFixed(2)}%，同比 {revenueYoyRate > 100 ? "增长" : "下降"} {Math.abs(revenueYoyRate - 100).toFixed(2)} 个百分点
       </p>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="月度收入" value={budgetVsActual?.revenue?.actual || 0} unit="万元" change={(budgetVsActual?.revenue?.rate || 100) - 100} changeLabel="预算达成率" inverse />
-        <KPICard label="月度毛利" value={budgetVsActual?.grossProfit?.actual || 0} unit="万元" change={(budgetVsActual?.grossProfit?.rate || 100) - 100} changeLabel="预算达成率" inverse />
+        <KPICard label="月度收入" value={revenueActual} unit="万元" change={revenueBudgetRate - 100} changeLabel="预算达成率" inverse />
+        <KPICard label="月度毛利" value={grossProfitActual} unit="万元" change={(budgetVsActual?.grossProfit?.rate || 100) - 100} changeLabel="预算达成率" inverse />
         <KPICard label="毛利率" value={grossMargin} unit="%" change={grossMargin - budgetMargin} changeLabel={`vs预算 ${budgetMargin.toFixed(2)}%`} />
-        <KPICard label="月度费用" value={budgetVsActual?.expense?.actual || 0} unit="万元" change={(budgetVsActual?.expense?.rate || 100) - 100} changeLabel="预算使用率" inverse />
+        <KPICard label="月度费用" value={overview.expenseActual} unit="万元" change={overview.expenseBudgetRate - 100} changeLabel="预算使用率" inverse />
       </div>
 
       {/* YoY KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="收入同比" value={yoy?.revenue?.rate || 0} unit="%" change={(yoy?.revenue?.rate || 100) - 100} changeLabel="同比增长" />
+        <KPICard label="收入同比" value={revenueYoyRate} unit="%" change={revenueYoyRate - 100} changeLabel="同比增长" />
         <KPICard label="毛利率同比" value={yoyGrossRate || 0} unit="%" change={(yoyGrossRate || 0) - 2.76} changeLabel="vs 同期" />
-        <KPICard label="累计收入" value={cumulative?.revenue?.budget || 0} unit="万元" change={(cumulative?.revenue?.rate || 100) - 100} changeLabel="季度达成率" inverse />
-        <KPICard label="累计费用预算" value={cumulative?.expense?.budget || 0} unit="万元" change={(cumulative?.expense?.rate || 100) - 100} changeLabel="已使用占比" />
+        <KPICard label="累计收入" value={cumulative?.revenue?.budget || 0} unit="万元" change={overview.cumulativeRevenueRate - 100} changeLabel="季度达成率" inverse />
+        <KPICard label="累计费用预算" value={cumulative?.expense?.budget || 0} unit="万元" change={overview.cumulativeExpenseRate - 100} changeLabel="已使用占比" />
       </div>
 
       {/* Charts row */}
