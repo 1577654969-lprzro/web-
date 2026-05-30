@@ -1,6 +1,7 @@
 import { useDashboardStore } from "../../store/dashboardStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { APP_VERSION } from "../../config/api";
 
 export default function StatusBar() {
   const { dataSource, toast, clearToast, data } = useDashboardStore();
@@ -41,7 +42,7 @@ export default function StatusBar() {
         </div>
         <div className="flex items-center gap-3">
           {/* 这里可以放一些全局状态图标，或者留空让右侧插件处理导航 */}
-          <span className="text-text-muted italic opacity-50">数据驱动决策</span>
+          <span className="text-text-muted text-[10px]">v{APP_VERSION}</span>
         </div>
       </div>
 
