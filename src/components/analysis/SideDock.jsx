@@ -13,15 +13,21 @@ export default function SideDock() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncMsg("");
-    const result = await syncDashboardData();
-    if (result.ok) {
-      batchUpdate(result.data);
-      setToast(`已同步 ${result.keys} 类数据`, "success");
-      setSyncMsg(`已同步 ${result.keys} 类`);
-      if (result.warning) setSyncMsg(result.warning);
-    } else {
-      setSyncMsg(result.message || "同步失败");
+    try {
+      const result = await syncDashboardData();
+      if (result.ok) {
+        batchUpdate(result.data);
+        setToast(`已同步 ${result.keys} 类数据`, "success");
+        setSyncMsg(`已同步 ${result.keys} 类`);
+        if (result.warning) setSyncMsg(result.warning);
+      } else {
+        setSyncMsg(result.message || "同步失败");
+      }
+    } catch {
+      setSyncMsg("后端未连接");
     }
+    setSyncing(false);
+    setTimeout(() => setSyncMsg(""), 3000);
   };
 
   return (

@@ -36,11 +36,18 @@ export function withDefaults(data) {
   
   Object.keys(normalized).forEach(key => {
     const val = normalized[key];
-    // 如果标准化后的数据不为空，则覆盖默认值
+    // 只覆盖有实际数据（非零/非空）的值
     if (Array.isArray(val)) {
       if (val.length > 0) result[key] = val;
-    } else if (val && typeof val === 'object') {
-      if (Object.keys(val).length > 0) result[key] = val;
+    } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+      // 嵌套对象：检查是否有非零数值或非空数组
+      const hasRealData = Object.values(val).some(v => {
+        if (typeof v === 'number') return v > 0;
+        if (Array.isArray(v)) return v.length > 0;
+        if (v && typeof v === 'object') return Object.keys(v).length > 0;
+        return !!v;
+      });
+      if (hasRealData) result[key] = val;
     }
   });
 
