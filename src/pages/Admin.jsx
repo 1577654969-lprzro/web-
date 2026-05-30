@@ -42,18 +42,26 @@ export default function Admin() {
     try {
       await fetch(`${VAULT_API}/process`, { method: "POST" });
       await loadHistory();
-      // 检查最新记录的匹配报告
       const r = await fetch(`${VAULT_API}/history`);
       const j = await r.json();
-      const done = (j.history || []).find(h => h.status === "done" && h.match_info);
-      if (done && done.match_info) {
+      const done = (j.history || []).find(h => h.status === "done");
+      if (done) {
+        // 获取实际解析数据用于预览
+        let preview = null;
         try {
-          const mi = JSON.parse(done.match_info);
-          setConfirmData({ file: done.filename, match: mi, id: done.id });
-          setMsg(`解析完成，请确认 ${done.filename} 的列名匹配`);
-        } catch { setConfirmData(null); setMsg("解析完成"); }
+          const pr = await fetch(`${VAULT_API}/sync/${done.id}`, { method: "POST" });
+          const pj = await pr.json();
+          if (pj.status === "ok" && pj.data) preview = pj.data;
+        } catch {}
+        setConfirmData({
+          file: done.filename,
+          match: done.match_info ? JSON.parse(done.match_info) : { matched: 0, unmatched: 0, total_cols: 0, unmatched_cols: [] },
+          id: done.id,
+          preview,
+        });
+        setMsg(`解析完成，请确认数据`);
       } else {
-        setMsg(`解析完成`);
+        setMsg("解析完成");
       }
     } catch { setMsg("解析失败"); }
     setProcessing(false);
@@ -132,6 +140,35 @@ export default function Admin() {
                 </div>
               )}
             </div>
+
+            {/* 数据预览 */}
+            {confirmData.preview && (() => {
+              const p = confirmData.preview;
+              const ov = p.overviewData?.budgetVsActual;
+              const depts = p.departmentData || [];
+              const exp = p.expenseBreakdown || [];
+              return (
+                <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
+                  <p className="text-xs font-semibold text-text-primary">数据预览</p>
+                  {ov?.revenue?.actual > 0 && (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <span className="text-text-muted">收入</span>
+                      <span className="text-text-primary font-mono">{(ov.revenue.actual / 10000).toFixed(0)} 万</span>
+                      <span className="text-text-muted">毛利</span>
+                      <span className="text-text-primary font-mono">{(ov.grossProfit?.actual / 10000).toFixed(0)} 万</span>
+                      <span className="text-text-muted">部门数</span>
+                      <span className="text-text-primary font-mono">{depts.length} 个</span>
+                      <span className="text-text-muted">费用项</span>
+                      <span className="text-text-primary font-mono">{exp.length} 项</span>
+                    </div>
+                  )}
+                  {(!ov || ov.revenue?.actual <= 0) && (
+                    <p className="text-xs text-text-muted italic">未提取到有效数值数据，将使用演示数据补充</p>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="flex gap-2">
               <button onClick={handleConfirmSync}
                 className="flex-1 py-2.5 rounded-lg bg-positive text-white text-sm font-bold hover:opacity-90">
