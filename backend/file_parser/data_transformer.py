@@ -83,14 +83,53 @@ def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
     """Agent 驱动数据转换：Sheet 名 + 列名 都自动匹配"""
     result = {}
 
-    # 1. 经营概览
+    # 1. 经营概览 — 跳过空标题行，找第一个有实际数据的行
     p4 = _find_sheet(raw_data, "overviewData", OVERVIEW)
     if p4:
-        r = p4[0]
+        # 找第一个 revenue_actual > 0 的行（跳过标题行）
+        r = None
+        for row in p4:
+            raw_val = row.get(OVERVIEW["fields"]["revenue_actual"][0])
+            if raw_val is None:
+                # Agent fallback
+                for col_name, cell_val in row.items():
+                    m = _match_col(str(col_name))
+                    if m and m[0] == "revenue":
+                        raw_val = cell_val
+                        break
+            if raw_val is not None and _safe_float(raw_val) > 0:
+                r = row
+                break
+    if p4:
+        # 找第一个有实际数据的行（跳过标题行）
+        r = None
+        for row in p4:
+            raw_val = row.get(OVERVIEW["fields"]["revenue_actual"][0])
+            if raw_val is None:
+                for col_name, cell_val in row.items():
+                    m = _match_col(str(col_name))
+                    if m and m[0] == "revenue":
+                        raw_val = cell_val
+                        break
+            if raw_val is not None and _safe_float(raw_val) > 0:
+                r = row
+                break
+        r = r or p4[0]  # fallback to first row
+
         def _get(k):
             col_info = OVERVIEW["fields"].get(k)
             if not col_info: return 0.0
-            return _safe_float(r.get(col_info[0]))
+            raw_val = r.get(col_info[0])
+            if raw_val is None:
+                for col_name, cell_val in r.items():
+                    m = _match_col(str(col_name))
+                    if m:
+                        matched_field = m[0]
+                        if matched_field == k or k.startswith(matched_field + "_"):
+                            raw_val = cell_val
+                            break
+            return _safe_float(raw_val)
+
         result["overviewData"] = {
             "month": "2026年4月",
             "budgetVsActual": {

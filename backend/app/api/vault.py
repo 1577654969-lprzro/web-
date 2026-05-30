@@ -8,6 +8,7 @@ from fastapi import APIRouter, UploadFile, File
 
 from ..db import db_session
 from file_parser import read_excel, transform
+from file_parser.adapter_66mb import adapt as adapt_66mb
 from file_parser.column_matcher import match_report
 
 router = APIRouter(prefix="/api/vault")
@@ -19,12 +20,21 @@ def _parse_file_sync(filepath: Path):
     """同步解析（读取全部 Sheet，Agent 自动匹配列名）"""
     ext = filepath.suffix.lower()
     if ext in (".xlsx", ".xls"):
-        raw = read_excel(str(filepath))  # 读取全部 Sheet，不限制
+        raw = read_excel(str(filepath))
+        sheets = list(raw.keys())
+
+        # 自动检测格式：如果有 "汇总" sheet 则用专有适配器
+        is_66mb_format = any("汇总" in str(s) for s in sheets)
+        if is_66mb_format:
+            data = adapt_66mb(raw)
+        else:
+            data = transform(raw)
+
         match_info = {}
         all_cols = set()
         for sheet_name, rows in raw.items():
             if rows:
-                cols = list(rows[0].keys())
+                cols = list(rows[0].keys())[:30]
                 all_cols.update(cols)
         mr = match_report(list(all_cols))
         match_info = {
@@ -33,7 +43,6 @@ def _parse_file_sync(filepath: Path):
             "unmatched_cols": mr["unmatched"][:10],
             "total_cols": mr["total"],
         }
-        data = transform(raw)
         rows = sum(len(v) if isinstance(v, list) else 1 for v in data.values())
         return "excel", json.dumps(data, ensure_ascii=False), rows, None, match_info
     return None, None, 0, "仅支持 .xlsx/.xls 文件", {}
