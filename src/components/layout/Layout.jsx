@@ -26,7 +26,7 @@ function LayoutInner() {
       <StatusBar />
       <div className="flex flex-1 overflow-hidden pr-[52px]">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-10">
+        <main className="flex-1 overflow-y-auto p-12">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

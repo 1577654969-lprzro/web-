@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File
 
 from ..db import db_session
-from file_parser import read_excel, read_pptx, read_docx, transform
+from file_parser import read_excel, transform
 from file_parser.column_matcher import match_report
 
 router = APIRouter(prefix="/api/vault")
@@ -36,13 +36,7 @@ def _parse_file_sync(filepath: Path):
         data = transform(raw)
         rows = sum(len(v) if isinstance(v, list) else 1 for v in data.values())
         return "excel", json.dumps(data, ensure_ascii=False), rows, None, match_info
-    elif ext == ".pptx":
-        data = read_pptx(str(filepath))
-        return "pptx", json.dumps(data, ensure_ascii=False), len(data), None, {}
-    elif ext == ".docx":
-        data = read_docx(str(filepath))
-        return "docx", json.dumps(data, ensure_ascii=False), data.get("paragraph_count", 0), None, {}
-    return None, None, 0, "不支持的文件类型", {}
+    return None, None, 0, "仅支持 .xlsx/.xls 文件", {}
 
 
 # ── 上传 ────────────────────────────────────────

@@ -154,7 +154,7 @@ export default function Admin() {
             <div className="space-y-2">
               <button onClick={() => fileRef.current?.click()}
                 className="w-full py-2.5 rounded-lg bg-accent/20 border border-accent/30 text-accent text-sm font-medium hover:bg-accent/30 transition-all">
-                选择文件 (.xlsx/.pptx/.docx)
+                选择文件 (.xlsx/.xls)
               </button>
               <button onClick={() => folderRef.current?.click()}
                 className="w-full py-2.5 rounded-lg bg-white/5 border border-white/10 text-text-secondary text-sm hover:bg-white/10 transition-all">
