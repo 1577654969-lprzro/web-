@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useDashboardStore } from "../store/dashboardStore";
 import { VAULT_API } from "../config/api";
+import { syncDashboardData } from "../services/syncService";
 
 export default function Admin() {
   const [history, setHistory] = useState([]);
@@ -48,15 +49,14 @@ export default function Admin() {
 
   const handleSync = async () => {
     setSyncing(true);
-    try {
-      const r = await fetch(`${VAULT_API}/sync`, { method: "POST" });
-      const j = await r.json();
-      if (j.status === "ok" && j.data) {
-        batchUpdate(j.data);
-        setDataSource({ filename: `数据中心 (${j.keys}类)`, uploadedAt: Date.now() });
-        setToast(`已同步 ${j.keys} 类数据到看板`, "success");
-      }
-    } catch { setMsg("同步失败"); }
+    const result = await syncDashboardData();
+    if (result.ok) {
+      batchUpdate(result.data);
+      setDataSource({ filename: `数据中心 (${result.keys}类)`, uploadedAt: Date.now() });
+      setToast(`已同步 ${result.keys} 类数据到看板`, "success");
+    } else {
+      setMsg(result.message || "同步失败");
+    }
     setSyncing(false);
   };
 

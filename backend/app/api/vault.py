@@ -8,6 +8,7 @@ from fastapi import APIRouter, UploadFile, File
 
 from ..db import db_session
 from file_parser import read_excel, read_pptx, read_docx, transform
+from file_parser.column_matcher import match_report
 
 router = APIRouter(prefix="/api/vault")
 VAULT_DIR = Path(__file__).parent.parent.parent / "file_vault"
@@ -112,7 +113,23 @@ async def vault_process():
                 )
                 done += 1
 
-    return {"status": "ok", "done": done, "failed": failed}
+    # 生成匹配报告
+    reports = {}
+    for r in queued:
+        path = VAULT_DIR / r["filename"]
+        if path.exists() and path.suffix.lower() in (".xlsx", ".xls"):
+            try:
+                raw = read_excel(str(path), sheets=NEEDED_SHEETS[:1])
+                all_cols = []
+                for rows in raw.values():
+                    if rows:
+                        all_cols = list(rows[0].keys())
+                        break
+                reports[r["filename"]] = match_report(all_cols)
+            except Exception:
+                pass
+
+    return {"status": "ok", "done": done, "failed": failed, "match_reports": reports}
 
 
 # ── 同步 ────────────────────────────────────────

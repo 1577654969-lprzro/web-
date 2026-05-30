@@ -10,6 +10,7 @@
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
 
+from .column_matcher import match_column as _match_col
 from .mappings import (
     OVERVIEW, EXPENSE, DEPARTMENTS,
     BIZ_CUSTOMER_TOP10, BIZ_PRODUCT_TOP10, ONLINE_SALES,
@@ -36,20 +37,30 @@ def _safe_float(val: Any, default: float = 0.0) -> float:
         return default
 
 def _clean_row(row: Dict[str, Any], fields_map: Dict[str, tuple]) -> Dict[str, Any]:
-    """根据定义过滤并转换单行数据"""
+    """根据定义过滤并转换单行数据，支持 Agent 列名语义匹配"""
     cleaned = {}
     is_empty = True
-    
+
     for target_key, (source_col, coerce_func) in fields_map.items():
+        # 1) 精确匹配
         raw_val = row.get(source_col)
+
+        # 2) 精确匹配失败 → Agent 语义匹配
+        if raw_val is None:
+            for col_name, cell_val in row.items():
+                match = _match_col(str(col_name))
+                if match and match[0] == target_key:
+                    raw_val = cell_val
+                    break
+
         if raw_val is not None and str(raw_val).strip():
             is_empty = False
-            
+
         if coerce_func in (int, float):
             cleaned[target_key] = _safe_float(raw_val)
         else:
             cleaned[target_key] = str(raw_val).strip() if raw_val is not None else ""
-            
+
     return cleaned if not is_empty else None
 
 def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
@@ -76,9 +87,13 @@ def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
             },
             "yoy": {
                 "revenue": {"actual": _get("revenue_actual"), "yoy": _get("revenue_yoy"), "rate": _get("revenue_yoy_rate")},
+                "grossProfit": {"actual": _get("gp_actual"), "yoy": 0, "rate": 0},
+                "expense": {"actual": _get("expense_actual"), "yoy": 0, "rate": 0},
+                "netProfit": {"actual": 0, "yoy": 0, "rate": 0},
             },
             "cumulative": {
                 "revenue": {"actual": _get("revenue_actual"), "budget": _get("revenue_cum_budget"), "rate": _get("revenue_cum_rate")},
+                "grossProfit": {"actual": _get("gp_actual"), "budget": 0, "rate": 0},
                 "expense": {"actual": _get("expense_actual"), "budget": _get("expense_cum_budget"), "rate": _get("expense_cum_rate")},
             }
         }
@@ -131,8 +146,9 @@ def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
     # 供应商库存
     result["inventorySupplier"] = {
         "totalStock": sum(_safe_float(r.get("库存金额")) for r in raw_data.get(INVENTORY_SUPPLIER_TOP10["sheet"], [])),
+        "remainingStock": [],  # 供应商库龄分布（如 Excel 有此 Sheet 则填充）
         "top10Suppliers": [_clean_row(r, INVENTORY_SUPPLIER_TOP10["fields"]) for r in raw_data.get(INVENTORY_SUPPLIER_TOP10["sheet"], [])[:10]],
-        "supplierConcentration": 0.0 # Will be calculated on frontend or here
+        "supplierConcentration": 0.0
     }
 
     # 校验输出结构完整性
