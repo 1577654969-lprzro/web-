@@ -63,7 +63,7 @@ FIELD_KEYWORDS = {
     "date": ["日期", "月份", "时间"],
     "dept": ["部门", "事业部", "板块", "dept"],
     "channel": ["渠道", "平台", "channel"],
-    "amount": ["金额", "元", "万元", "amount"],
+    "amount": ["金额", "万元", "amount"],
     "name": ["名称", "名字", "name"],
     "rate": ["率", "%", "rate", "ratio"],
 }
@@ -95,12 +95,12 @@ def match_column(col_name: str) -> tuple[str, float] | None:
             if not kw_clean:
                 continue
 
-            # 精确包含匹配
+            # 精确包含匹配 — 分数与关键词长度成正比（长词优先）
             if kw_clean in cleaned or cleaned in kw_clean:
-                score = 0.9
-            # 部分匹配（每个字符都在）
-            elif all(c in cleaned for c in kw_clean) and len(kw_clean) >= 2:
-                score = 0.6
+                score = 0.7 + min(len(kw_clean) * 0.05, 0.25)  # 2字=0.8, 4字=0.9, 6字=0.95
+            # 单字符匹配必须完整词匹配
+            elif len(kw_clean) >= 2 and all(c in cleaned for c in kw_clean):
+                score = 0.5 + min(len(kw_clean) * 0.03, 0.15)
             else:
                 continue
 
@@ -126,6 +126,50 @@ def match_columns(headers: list[str]) -> dict[str, str]:
         if m:
             result[h] = m[0]
     return result
+
+
+# ── Sheet 名关键词 ────────────────────────────
+SHEET_KEYWORDS = {
+    "overviewData": ["汇总", "概览", "总览", "经营", "P4", "overview", "summary"],
+    "expenseBreakdown": ["费用", "支出", "开支", "P6", "expense"],
+    "departmentData": ["部门", "事业部", "分部", "P5", "dept"],
+    "bizCustomerTop10": ["客户", "买方", "P10", "customer"],
+    "bizProductTop10": ["产品", "商品", "品类", "P10", "product"],
+    "productCategoryData": ["摇钱树", "钱串子", "瘦狗", "现金牛", "category"],
+    "onlineSalesData": ["线上", "电商", "平台", "P13", "online"],
+    "arData": ["应收", "AR", "P15", "receivable"],
+    "apData": ["应付", "AP", "P16", "payable"],
+    "arByPerson": ["业务员", "销售员", "P17", "person"],
+    "inventoryProduct": ["库存", "存货", "P20", "inventory"],
+    "inventorySupplier": ["供应商", "P21", "supplier"],
+    "freightByChannel": ["运费", "物流", "快递", "P23", "freight"],
+    "freightOverview": ["运费总", "P23"],
+}
+
+
+def match_sheet(name: str) -> tuple[str, float] | None:
+    """匹配 Sheet 名到数据键"""
+    cleaned = _clean(name)
+    if not cleaned:
+        return None
+    best_key, best_score = None, 0.0
+    for key, keywords in SHEET_KEYWORDS.items():
+        for kw in keywords:
+            kw_clean = _clean(kw)
+            if not kw_clean:
+                continue
+            if kw_clean in cleaned or cleaned in kw_clean:
+                score = 0.9
+            elif all(c in cleaned for c in kw_clean) and len(kw_clean) >= 2:
+                score = 0.6
+            else:
+                continue
+            if score > best_score:
+                best_score = score
+                best_key = key
+    if best_score >= 0.5:
+        return (best_key, best_score)
+    return None
 
 
 def match_report(headers: list[str]) -> dict:

@@ -10,7 +10,7 @@
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
 
-from .column_matcher import match_column as _match_col
+from .column_matcher import match_column as _match_col, match_sheet as _match_sheet
 from .mappings import (
     OVERVIEW, EXPENSE, DEPARTMENTS,
     BIZ_CUSTOMER_TOP10, BIZ_PRODUCT_TOP10, ONLINE_SALES,
@@ -66,21 +66,31 @@ def _clean_row(row: Dict[str, Any], fields_map: Dict[str, tuple]) -> Dict[str, A
 
     return cleaned if not is_empty else None
 
+def _find_sheet(raw_data, target_key, mapping_config):
+    """Agent 方式查找 Sheet: 先精确匹配映射名, 再 Agent 匹配 Sheet 名"""
+    hard_name = mapping_config["sheet"]
+    if hard_name in raw_data:
+        return raw_data[hard_name]
+    # Agent sheet 匹配
+    for sheet_name, rows in raw_data.items():
+        m = _match_sheet(str(sheet_name))
+        if m and m[0] == target_key:
+            return rows
+    return []
+
+
 def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
-    """
-    模块化数据转换主函数
-    """
+    """Agent 驱动数据转换：Sheet 名 + 列名 都自动匹配"""
     result = {}
 
-    # 1. 经营概览解析 (P4)
-    p4 = raw_data.get(OVERVIEW["sheet"], [])
+    # 1. 经营概览
+    p4 = _find_sheet(raw_data, "overviewData", OVERVIEW)
     if p4:
         r = p4[0]
-        def _get(k): 
+        def _get(k):
             col_info = OVERVIEW["fields"].get(k)
             if not col_info: return 0.0
             return _safe_float(r.get(col_info[0]))
-        
         result["overviewData"] = {
             "month": "2026年4月",
             "budgetVsActual": {
@@ -101,7 +111,7 @@ def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
             }
         }
 
-    # 2. 列表类数据通用解析
+    # 2. 列表类数据
     list_mappings = [
         ("expenseBreakdown", EXPENSE),
         ("departmentData", DEPARTMENTS),
@@ -111,50 +121,37 @@ def transform(raw_data: Dict[str, List[Dict]]) -> Dict[str, Any]:
         ("arByPerson", AR_BY_PERSON),
         ("freightByChannel", FREIGHT_CHANNEL),
     ]
-
     for store_key, config in list_mappings:
-        rows = raw_data.get(config["sheet"], [])
-        cleaned_rows = []
-        for r in rows:
-            cleaned = _clean_row(r, config["fields"])
-            if cleaned:
-                cleaned_rows.append(cleaned)
+        rows = _find_sheet(raw_data, store_key, config)
+        cleaned_rows = [_clean_row(r, config["fields"]) for r in rows if _clean_row(r, config["fields"])]
         result[store_key] = cleaned_rows
 
-    # 3. 复杂嵌套结构解析
-    # 应收账款
-    ar_rows = raw_data.get(AR_AGING["sheet"], [])
+    # 3. 复杂嵌套
+    ar_rows = _find_sheet(raw_data, "arData", AR_AGING)
     result["arData"] = {
         "totalAR": sum(_safe_float(r.get("余额")) for r in ar_rows if "余额" in r),
         "arByDept": [_clean_row(r, AR_AGING["fields"]) for r in ar_rows if _clean_row(r, AR_AGING["fields"])],
-        "top10Customers": [_clean_row(r, AR_TOP10["fields"]) for r in raw_data.get(AR_TOP10["sheet"], [])[:10]]
+        "top10Customers": [_clean_row(r, AR_TOP10["fields"]) for r in _find_sheet(raw_data, "arData", AR_TOP10)[:10]]
     }
-
-    # 应付账款
-    ap_dist_rows = raw_data.get(AP_AGING_DIST["sheet"], [])
+    ap_rows = _find_sheet(raw_data, "apData", AP_AGING_DIST)
     result["apData"] = {
-        "totalAP": sum(_safe_float(r.get("余额")) for r in ap_dist_rows if "余额" in r),
-        "agingDistribution": [_clean_row(r, AP_AGING_DIST["fields"]) for r in ap_dist_rows if _clean_row(r, AP_AGING_DIST["fields"])],
-        "top10Suppliers": [_clean_row(r, AP_TOP10["fields"]) for r in raw_data.get(AP_TOP10["sheet"], [])[:10]]
+        "totalAP": sum(_safe_float(r.get("余额")) for r in ap_rows if "余额" in r),
+        "agingDistribution": [_clean_row(r, AP_AGING_DIST["fields"]) for r in ap_rows if _clean_row(r, AP_AGING_DIST["fields"])],
+        "top10Suppliers": [_clean_row(r, AP_TOP10["fields"]) for r in _find_sheet(raw_data, "apData", AP_TOP10)[:10]]
     }
-
-    # 库存分析
-    inv_rows = raw_data.get(INVENTORY_PRODUCT_REMAINING["sheet"], [])
+    inv_rows = _find_sheet(raw_data, "inventoryProduct", INVENTORY_PRODUCT_REMAINING)
     result["inventoryProduct"] = {
         "remainingStock": [_clean_row(r, INVENTORY_PRODUCT_REMAINING["fields"]) for r in inv_rows if _clean_row(r, INVENTORY_PRODUCT_REMAINING["fields"])],
-        "inStockAging": [_clean_row(r, INVENTORY_PRODUCT_IN_STOCK["fields"]) for r in raw_data.get(INVENTORY_PRODUCT_IN_STOCK["sheet"], []) if _clean_row(r, INVENTORY_PRODUCT_IN_STOCK["fields"])],
-        "top10Products": [_clean_row(r, INVENTORY_PRODUCT_TOP10["fields"]) for r in raw_data.get(INVENTORY_PRODUCT_TOP10["sheet"], [])[:10]]
+        "inStockAging": [_clean_row(r, INVENTORY_PRODUCT_IN_STOCK["fields"]) for r in _find_sheet(raw_data, "inventoryProduct", INVENTORY_PRODUCT_IN_STOCK) if _clean_row(r, INVENTORY_PRODUCT_IN_STOCK["fields"])],
+        "top10Products": [_clean_row(r, INVENTORY_PRODUCT_TOP10["fields"]) for r in _find_sheet(raw_data, "inventoryProduct", INVENTORY_PRODUCT_TOP10)[:10]]
     }
-
-    # 供应商库存
     result["inventorySupplier"] = {
-        "totalStock": sum(_safe_float(r.get("库存金额")) for r in raw_data.get(INVENTORY_SUPPLIER_TOP10["sheet"], [])),
-        "remainingStock": [],  # 供应商库龄分布（如 Excel 有此 Sheet 则填充）
-        "top10Suppliers": [_clean_row(r, INVENTORY_SUPPLIER_TOP10["fields"]) for r in raw_data.get(INVENTORY_SUPPLIER_TOP10["sheet"], [])[:10]],
+        "totalStock": sum(_safe_float(r.get("库存金额")) for r in _find_sheet(raw_data, "inventorySupplier", INVENTORY_SUPPLIER_TOP10)),
+        "remainingStock": [],
+        "top10Suppliers": [_clean_row(r, INVENTORY_SUPPLIER_TOP10["fields"]) for r in _find_sheet(raw_data, "inventorySupplier", INVENTORY_SUPPLIER_TOP10)[:10]],
         "supplierConcentration": 0.0
     }
 
-    # 校验输出结构完整性
     _validate_output(result)
     return result
 
