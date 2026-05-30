@@ -12,25 +12,37 @@ from file_parser.column_matcher import match_report
 
 router = APIRouter(prefix="/api/vault")
 VAULT_DIR = Path(__file__).parent.parent.parent / "file_vault"
-NEEDED_SHEETS = ["P4", "P5", "P6", "P10", "P12", "P13", "P15", "P16", "P17", "P20", "P21", "P23"]
 VAULT_DIR.mkdir(exist_ok=True)
 
 
 def _parse_file_sync(filepath: Path):
-    """同步解析（在 executor 线程中运行，不阻塞事件循环）"""
+    """同步解析（读取全部 Sheet，Agent 自动匹配列名）"""
     ext = filepath.suffix.lower()
     if ext in (".xlsx", ".xls"):
-        raw = read_excel(str(filepath), sheets=NEEDED_SHEETS)
+        raw = read_excel(str(filepath))  # 读取全部 Sheet，不限制
+        match_info = {}
+        all_cols = set()
+        for sheet_name, rows in raw.items():
+            if rows:
+                cols = list(rows[0].keys())
+                all_cols.update(cols)
+        mr = match_report(list(all_cols))
+        match_info = {
+            "matched": len(mr["matched"]),
+            "unmatched": len(mr["unmatched"]),
+            "unmatched_cols": mr["unmatched"][:10],
+            "total_cols": mr["total"],
+        }
         data = transform(raw)
         rows = sum(len(v) if isinstance(v, list) else 1 for v in data.values())
-        return "excel", json.dumps(data, ensure_ascii=False), rows, None
+        return "excel", json.dumps(data, ensure_ascii=False), rows, None, match_info
     elif ext == ".pptx":
         data = read_pptx(str(filepath))
-        return "pptx", json.dumps(data, ensure_ascii=False), len(data), None
+        return "pptx", json.dumps(data, ensure_ascii=False), len(data), None, {}
     elif ext == ".docx":
         data = read_docx(str(filepath))
-        return "docx", json.dumps(data, ensure_ascii=False), data.get("paragraph_count", 0), None
-    return None, None, 0, "不支持的文件类型"
+        return "docx", json.dumps(data, ensure_ascii=False), data.get("paragraph_count", 0), None, {}
+    return None, None, 0, "不支持的文件类型", {}
 
 
 # ── 上传 ────────────────────────────────────────
@@ -91,13 +103,14 @@ async def vault_process():
         try:
             # 线程池执行，不阻塞事件循环，30s 超时
             loop = asyncio.get_event_loop()
-            ft, data_json, row_count, error = await asyncio.wait_for(
+            ft, data_json, row_count, error, match_info = await asyncio.wait_for(
                 loop.run_in_executor(None, _parse_file_sync, filepath),
                 timeout=30.0,
             )
+            match_info = match_info or {}
         except asyncio.TimeoutError:
             error = "解析超时(>30s)"
-            ft, data_json, row_count = None, None, 0
+            ft, data_json, row_count, match_info = None, None, 0, {}
 
         async with db_session() as db:
             if error:
@@ -108,28 +121,12 @@ async def vault_process():
                 failed += 1
             else:
                 await db.execute(
-                    "UPDATE uploads SET status='done', file_type=?, row_count=?, parsed_data=?, updated_at=? WHERE id=?",
-                    (ft, row_count, data_json, datetime.now().isoformat(), row["id"]),
+                    "UPDATE uploads SET status='done', file_type=?, row_count=?, parsed_data=?, match_info=?, updated_at=? WHERE id=?",
+                    (ft, row_count, data_json, json.dumps(match_info, ensure_ascii=False), datetime.now().isoformat(), row["id"]),
                 )
                 done += 1
 
-    # 生成匹配报告
-    reports = {}
-    for r in queued:
-        path = VAULT_DIR / r["filename"]
-        if path.exists() and path.suffix.lower() in (".xlsx", ".xls"):
-            try:
-                raw = read_excel(str(path), sheets=NEEDED_SHEETS[:1])
-                all_cols = []
-                for rows in raw.values():
-                    if rows:
-                        all_cols = list(rows[0].keys())
-                        break
-                reports[r["filename"]] = match_report(all_cols)
-            except Exception:
-                pass
-
-    return {"status": "ok", "done": done, "failed": failed, "match_reports": reports}
+    return {"status": "ok", "done": done, "failed": failed}
 
 
 # ── 同步 ────────────────────────────────────────

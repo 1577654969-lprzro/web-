@@ -40,6 +40,7 @@ async def init_db():
             file_type TEXT,
             row_count INTEGER DEFAULT 0,
             error TEXT,
+            match_info TEXT,
             parsed_data TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
