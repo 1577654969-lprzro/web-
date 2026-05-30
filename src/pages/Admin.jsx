@@ -46,22 +46,21 @@ export default function Admin() {
       const j = await r.json();
       const done = (j.history || []).find(h => h.status === "done");
       if (done) {
-        // 获取实际解析数据用于预览
         let preview = null;
         try {
           const pr = await fetch(`${VAULT_API}/sync/${done.id}`, { method: "POST" });
           const pj = await pr.json();
           if (pj.status === "ok" && pj.data) preview = pj.data;
         } catch {}
+        const mi = done.match_info ? (() => { try { return JSON.parse(done.match_info); } catch { return null; } })() : null;
         setConfirmData({
           file: done.filename,
-          match: done.match_info ? JSON.parse(done.match_info) : { matched: 0, unmatched: 0, total_cols: 0, unmatched_cols: [] },
+          match: mi || { matched: 0, unmatched: 0, total_cols: 0, unmatched_cols: [] },
           id: done.id,
           preview,
         });
-        setMsg(`解析完成，请确认数据`);
       } else {
-        setMsg("解析完成");
+        setMsg("解析完成，无有效数据");
       }
     } catch { setMsg("解析失败"); }
     setProcessing(false);
@@ -147,24 +146,32 @@ export default function Admin() {
               const ov = p.overviewData?.budgetVsActual;
               const depts = p.departmentData || [];
               const exp = p.expenseBreakdown || [];
+              const hasData = ov?.revenue?.actual > 0;
               return (
                 <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
-                  <p className="text-xs font-semibold text-text-primary">数据预览</p>
-                  {ov?.revenue?.actual > 0 && (
+                  <p className="text-xs font-semibold text-text-primary">
+                    数据预览 {hasData ? "" : <span className="text-warning">(解析异常)</span>}
+                  </p>
+                  {hasData ? (
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <span className="text-text-muted">收入</span>
-                      <span className="text-text-primary font-mono">{(ov.revenue.actual / 10000).toFixed(0)} 万</span>
+                      <span className="text-positive font-mono font-bold">{(ov.revenue.actual / 10000).toFixed(0)} 万元</span>
                       <span className="text-text-muted">毛利</span>
-                      <span className="text-text-primary font-mono">{(ov.grossProfit?.actual / 10000).toFixed(0)} 万</span>
-                      <span className="text-text-muted">部门数</span>
+                      <span className="text-positive font-mono font-bold">{(ov.grossProfit?.actual / 10000).toFixed(0)} 万元</span>
+                      <span className="text-text-muted">部门</span>
                       <span className="text-text-primary font-mono">{depts.length} 个</span>
-                      <span className="text-text-muted">费用项</span>
+                      <span className="text-text-muted">费用</span>
                       <span className="text-text-primary font-mono">{exp.length} 项</span>
                     </div>
+                  ) : (
+                    <p className="text-xs text-warning font-medium">
+                      Excel 格式不匹配，无法提取有效数据。请检查文件格式后重新上传。
+                    </p>
                   )}
-                  {(!ov || ov.revenue?.actual <= 0) && (
-                    <p className="text-xs text-text-muted italic">未提取到有效数值数据，将使用演示数据补充</p>
-                  )}
+                  <p className="text-[10px] text-text-muted italic border-t border-white/5 pt-2">
+                    仅提取到数据: {hasData ? "收入/毛利/部门/费用" : "无"}。
+                    {hasData ? "其余字段(应收/应付/库存/运费等)当前留空，不会显示假数据。" : ""}
+                  </p>
                 </div>
               );
             })()}

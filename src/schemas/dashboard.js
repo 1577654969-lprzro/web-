@@ -34,22 +34,24 @@ export function withDefaults(data) {
   // 2. 对于缺失或为空的模块，使用 Mock 数据兜底
   const result = { ...MOCK_FALLBACK };
   
+  // 记录哪些字段有真实数据
+  const _has = {};
   Object.keys(normalized).forEach(key => {
     const val = normalized[key];
-    // 只覆盖有实际数据（非零/非空）的值
     if (Array.isArray(val)) {
-      if (val.length > 0) result[key] = val;
+      if (val.length > 0) { result[key] = val; _has[key] = true; }
     } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-      // 嵌套对象：检查是否有非零数值或非空数组
       const hasRealData = Object.values(val).some(v => {
         if (typeof v === 'number') return v > 0;
         if (Array.isArray(v)) return v.length > 0;
         if (v && typeof v === 'object') return Object.keys(v).length > 0;
         return !!v;
       });
-      if (hasRealData) result[key] = val;
+      if (hasRealData) { result[key] = val; _has[key] = true; }
     }
   });
+  // 附加元数据：哪些键来自真实数据
+  result._sourceMeta = { realKeys: Object.keys(_has), timestamp: Date.now() };
 
   return result;
 }
