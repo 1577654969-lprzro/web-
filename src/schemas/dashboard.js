@@ -1,59 +1,65 @@
 /**
- * 数据 Schema 与 默认值中心
- * 
- * 整合了 Mock Fallback 与 智能 Normalizer
+ * 数据 Schema — 公司看板模式：不上传Excel则无数据
+ * 禁止 mock 填充，未提取的字段显示"暂无数据"
  */
 import { normalizeDashboardData } from "../utils/normalizer";
-import * as mockData from "../data/mockData";
 
-const MOCK_FALLBACK = {
-  overviewData: mockData.overviewData,
-  expenseBreakdown: mockData.expenseBreakdown,
-  departmentData: mockData.departmentData,
-  bizCustomerTop10: mockData.bizCustomerTop10,
-  bizProductTop10: mockData.bizProductTop10,
-  productCategoryData: mockData.productCategoryData,
-  keyCustomerData: mockData.keyCustomerData,
-  onlineSalesData: mockData.onlineSalesData,
-  arData: mockData.arData,
-  apData: mockData.apData,
-  arByPerson: mockData.arByPerson,
-  inventoryProduct: mockData.inventoryProduct,
-  inventorySupplier: mockData.inventorySupplier,
-  freightOverview: mockData.freightOverview,
-  freightByChannel: mockData.freightByChannel,
+const EMPTY = {
+  overviewData: {
+    month: "",
+    budgetVsActual: {
+      revenue: { actual: 0, budget: 0, rate: 0 },
+      grossProfit: { actual: 0, budget: 0, rate: 0 },
+      expense: { actual: 0, budget: 0, rate: 0 },
+    },
+    yoy: { revenue: { actual: 0, yoy: 0, rate: 0 } },
+    cumulative: { revenue: { actual: 0, budget: 0, rate: 0 } },
+  },
+  expenseBreakdown: [],
+  departmentData: [],
+  bizCustomerTop10: [],
+  bizProductTop10: [],
+  productCategoryData: {},
+  keyCustomerData: { top10: [], strategy: { issue: "", action: "" } },
+  onlineSalesData: [],
+  arData: { totalAR: 0, arByDept: [], top10Customers: [] },
+  apData: { totalAP: 0, agingDistribution: [], top10Suppliers: [] },
+  arByPerson: [],
+  inventoryProduct: { remainingStock: [], inStockAging: [], top10Products: [] },
+  inventorySupplier: { totalStock: 0, remainingStock: [], top10Suppliers: [], supplierConcentration: 0 },
+  freightOverview: { totalFreight: 0, lastMonthFreight: 0, totalTickets: 0, lastMonthTickets: 0, feeRatio: 0, lastMonthFeeRatio: 0 },
+  freightByChannel: [],
 };
 
+export function getEmptyData() {
+  return JSON.parse(JSON.stringify(EMPTY));
+}
+
 /**
- * 核心导出：带默认值的标准化函数
+ * 标准化 + 只覆盖有真实数据的字段
  */
 export function withDefaults(data) {
-  // 1. 先进行智能映射和类型转换
-  const { data: normalized, diagnostics } = normalizeDashboardData(data || {});
-  
-  // 2. 对于缺失或为空的模块，使用 Mock 数据兜底
-  const result = { ...MOCK_FALLBACK };
-  
-  // 记录哪些字段有真实数据
+  const { data: normalized } = normalizeDashboardData(data || {});
+  const result = getEmptyData();
   const _has = {};
+
   Object.keys(normalized).forEach(key => {
+    if (!(key in result)) return;
     const val = normalized[key];
     if (Array.isArray(val)) {
       if (val.length > 0) { result[key] = val; _has[key] = true; }
-    } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-      const hasRealData = Object.values(val).some(v => {
+    } else if (val && typeof val === 'object') {
+      const hasData = Object.values(val).some(v => {
         if (typeof v === 'number') return v > 0;
         if (Array.isArray(v)) return v.length > 0;
-        if (v && typeof v === 'object') return Object.keys(v).length > 0;
         return !!v;
       });
-      if (hasRealData) { result[key] = val; _has[key] = true; }
+      if (hasData) { result[key] = val; _has[key] = true; }
     }
   });
-  // 附加元数据：哪些键来自真实数据
-  result._sourceMeta = { realKeys: Object.keys(_has), timestamp: Date.now() };
 
+  result._sourceMeta = { realKeys: Object.keys(_has), timestamp: Date.now() };
   return result;
 }
 
-export { validateSchema } from "../utils/normalizer"; // 可以从 normalizer 导出更详细的校验
+export { validateSchema } from "../utils/normalizer";

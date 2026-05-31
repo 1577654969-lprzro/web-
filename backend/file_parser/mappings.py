@@ -1,13 +1,11 @@
 """
-Excel Sheet → Frontend JSON 映射配置
-每个映射定义：源 sheet、列映射、输出结构
-
-修改此文件即可适配不同 Excel 布局，无需改动转换引擎。
+CSV Sheet → Frontend JSON 映射配置
+严格按照 Data Schema 标准定义，绝不臆造任何字段。
 """
 
-# 智能别名映射配置 (Smart Alias Map)
-# 格式: { "standard_field": ["alias1", "alias2", ...] }
+# ── 智能别名映射 (仅用于增强兼容性) ──────────────────
 SMART_ALIASES = {
+    "project": ["项目", "Project", "Item"],
     "revenue_actual": ["收入_实际", "实际收入", "本月收入", "营收_实际", "Revenue_Actual"],
     "revenue_budget": ["收入_预算", "预算收入", "目标收入", "Revenue_Budget"],
     "revenue_rate": ["收入_达成率", "达成率", "完成率", "Revenue_Rate"],
@@ -17,21 +15,190 @@ SMART_ALIASES = {
     "expense_actual": ["费用_实际", "实际费用", "本月支出", "Expense_Actual"],
     "expense_budget": ["费用_预算", "预算费用", "Expense_Budget"],
     "expense_rate": ["费用_使用率", "费用率", "Expense_Rate"],
+    "profit_actual": ["利润_实际", "实际利润", "Profit_Actual"],
+    "profit_budget": ["利润_预算", "预算利润", "Profit_Budget"],
     
-    # 部门相关
     "dept": ["部门", "事业部", "经营部", "Dept", "Department"],
-    "revenue202604": ["收入_202604", "本月收入", "收入", "Revenue"],
-    "revenueChange": ["收入_环比变化", "环比", "增长率", "Change"],
-    "grossProfitRate202604": ["毛利率_202604", "毛利率", "GPRate"],
-    
-    # 列表通用
+    "channel": ["渠道", "快递渠道", "平台", "Channel"],
     "name": ["客户名称", "产品名称", "名称", "供应商名称", "Name"],
     "amount": ["金额", "库存金额", "应收金额", "Amount"],
     "share": ["占比", "收入占比", "百分比", "Share"],
-    "channel": ["渠道", "快递渠道", "平台", "Channel"],
 }
 
-# ── 经营概览 ──────────────────────────────────
+# ── 1. 经营核心总表 (P4.csv) ─────────────────────────────
+P4_OVERVIEW = {
+    "sheet": ["P4"],
+    "type": "overview",
+    "budget_vs_actual": {
+        "project_field": "项目",
+        "metrics": {
+            "revenue": {
+                "actual": "实际（当月）",
+                "budget": "预算（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_budget": "预算（当季）",
+                "cum_rate": "当季达成率",
+            },
+            "grossProfit": {
+                "actual": "实际（当月）",
+                "budget": "预算（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_budget": "预算（当季）",
+                "cum_rate": "当季达成率",
+            },
+            "expense": {
+                "actual": "实际（当月）",
+                "budget": "预算（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_budget": "预算（当季）",
+                "cum_rate": "当季达成率",
+            },
+            "netProfit": {
+                "actual": "实际（当月）",
+                "budget": "预算（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_budget": "预算（当季）",
+                "cum_rate": "当季达成率",
+            },
+        },
+        "project_keywords": {
+            "revenue": ["收入", "营收"],
+            "grossProfit": ["毛利", "毛利额"],
+            "expense": ["费用", "支出"],
+            "netProfit": ["利润", "净利润"],
+        }
+    },
+    "yoy": {
+        "project_field": "项目",
+        "metrics": {
+            "revenue": {
+                "actual": "实际（当月）",
+                "yoy": "同比（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_yoy": "同比（当季）",
+                "cum_rate": "当季达成率",
+            },
+            "grossProfit": {
+                "actual": "实际（当月）",
+                "yoy": "同比（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_yoy": "同比（当季）",
+                "cum_rate": "当季达成率",
+            },
+            "expense": {
+                "actual": "实际（当月）",
+                "yoy": "同比（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_yoy": "同比（当季）",
+                "cum_rate": "当季达成率",
+            },
+            "netProfit": {
+                "actual": "实际（当月）",
+                "yoy": "同比（当月）",
+                "monthly_rate": "当月达成率",
+                "cum_actual": "累计（当季）",
+                "cum_yoy": "同比（当季）",
+                "cum_rate": "当季达成率",
+            },
+        }
+    }
+}
+
+# ── 2. 销售渠道与边际贡献表 (P5.csv) ──────────────────────
+P5_CHANNELS = {
+    "sheet": ["P5"],
+    "type": "channels",
+    "channels": [
+        "线上销售", "平台自营", "C端电商", "线下销售", "联营销售", "合计"
+    ],
+    "metrics": ["收入", "毛利", "毛利率", "边际贡献"],
+    "periods": ["202604", "202504", "对比"],
+}
+
+# ── 3. 费用明细表 (P6.csv) ────────────────────────────────
+P6_EXPENSE = {
+    "sheet": ["P6"],
+    "type": "expense",
+    "categories": [
+        "租金", "水电", "平台费", "物流供应链", "人工薪酬", "差旅招待", "其他费用"
+    ],
+    "amount_fields": {
+        "202604": "202604金额",
+        "202504": "202504金额",
+    },
+}
+
+# ── 4. 客户与商品排行贡献表 (P10.csv) ─────────────────────
+P10_CUSTOMER_PRODUCT = {
+    "sheet": ["P10"],
+    "type": "ranking",
+    "customer": {
+        "core_customers": [
+            "广东金安", "湖北药商通", "陕西铭铖", "石家庄极正",
+            "河北康云", "河北医霖", "湖北诚为上", "河北利康德",
+            "河北圣邦", "河北国泰"
+        ],
+        "metrics": ["含税收入", "销售占比", "毛利率", "毛利贡献"],
+    },
+    "product": {
+        "core_products": [
+            "(倍他乐克)琥珀酸美托洛尔缓释片",
+            "(信必可都保)布地奈德福莫特罗吸入粉雾剂（II）",
+            "(补佳乐)戊酸雌二醇片",
+            "(可定)瑞舒伐他汀钙片",
+            "(格华止)盐酸二甲双胍片",
+            "(达芙通)地屈孕酮片",
+            "(希刻劳)头孢克洛干混悬剂",
+            "(耐信)艾司奥美拉唑镁肠溶片",
+            "(艾纳香)咽立爽口含滴丸",
+            "(科达琳)复方氨酚肾素片",
+        ],
+        "metrics": ["含税收入", "销售占比", "毛利率", "毛利贡献"],
+    },
+}
+
+# ── 5. 店铺盈利明细表 (P13.csv) ──────────────────────────
+P13_STORES = {
+    "sheet": ["P13"],
+    "type": "stores",
+    "stores": [
+        "京东-仁医扁鹊大药房旗舰店",
+        "天猫-仁医扁鹊大药房旗舰店",
+        "拼多多-苗倾城大药房旗舰店",
+        "拼多多-至药云大药房旗舰店",
+        "美团-至远大药房旗舰店",
+        "合计"
+    ],
+    "metrics": [
+        "收入", "成本", "毛利", "平台费（固定扣点）", "其他", "店铺利润", "利润率"
+    ],
+}
+
+# ── 6. 应收账款账龄分析表 (P15.csv) ───────────────────────
+P15_AR_AGING = {
+    "sheet": ["P15"],
+    "type": "ar_aging",
+    "aging_buckets": [
+        "30天内", "30-60天", "60-180天", "180-360天", "360天以上", "总计", "占比"
+    ],
+    "departments": [
+        "大客户部", "连锁门店部", "商品拓展部", "商业部"
+    ],
+    "core_customers": [
+        "广州誉乾", "佛山大参林", "广东和嵘", "广东金安",
+        "江西仁海", "广东邦健", "广东百康", "浙江乐药",
+        "陕西伟业", "河北国泰"
+    ],
+}
+
+# ── 兼容旧版 Excel 映射 (保持向后兼容) ─────────────────────
 OVERVIEW = {
     "sheet": ["P4", "经营概览", "概览"],
     "fields": {
